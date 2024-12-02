@@ -25,7 +25,6 @@ jobs:
         run: tox -e 311
 
       - name: Inject PR number into coverage.xml
-        if: matrix.tests.sonar
         run: sed -i '2i <!-- PR ${{ github.event.number }} -->' coverage.xml
 
       - name: Upload coverage as artifact
