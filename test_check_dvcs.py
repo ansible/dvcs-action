@@ -68,11 +68,17 @@ class TestGetPreviousCommentsUrls:
 
 class TestDeletePreviousComments:
 
+    def test_missing_header(self):
+        with pytest.raises(check_dvcs.CommandException) as ce:
+            check_dvcs.delete_previous_comments([])
+        assert 'Auth header missing' in str(ce.value)
+
     def test_good_delete(self):
         base_url = 'https://example.com/'
         with requests_mock.Mocker() as m:
             m.register_uri('DELETE', f'{base_url}1', status_code=404)
             m.register_uri('DELETE', f'{base_url}2', status_code=204)
+            check_dvcs.http_headers['Authorization'] = 'Bearer 1234'
             check_dvcs.delete_previous_comments([f'{base_url}1', f'{base_url}2'])
 
     def test_bad_deletes(self):
@@ -83,6 +89,7 @@ class TestDeletePreviousComments:
             m.register_uri('DELETE', f'{base_url}3', status_code=404)
             m.register_uri('DELETE', f'{base_url}4', status_code=204)
             with pytest.raises(check_dvcs.CommandException) as ce:
+                check_dvcs.http_headers['Authorization'] = 'Bearer 1234'
                 check_dvcs.delete_previous_comments(
                     [
                         f'{base_url}1',
