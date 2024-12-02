@@ -309,7 +309,7 @@ class TestMakeDecisions:
                 f"{check_dvcs._NO_JIRA_MARKER}",  # it does not show an error message for no jira commit
                 ['This is a commit', 'this is another commit', 'this is another commit'],
                 f'{check_dvcs._NO_JIRA_MARKER}',
-                f"* {check_dvcs.bad_icon} / not the result ?",
+                f"* {check_dvcs.bad_icon} Commit Mismatch: At least one commit is required with no_jira",
             ),
             (  # Source branch is none
                 f"{check_dvcs._NO_JIRA_MARKER}",
@@ -327,7 +327,7 @@ class TestMakeDecisions:
                 f"{check_dvcs._NO_JIRA_MARKER}",
                 [f'{check_dvcs._NO_JIRA_MARKER}'],
                 'ABCDE-1234',  # source accepts different types of JIRA formats.
-                f"* {check_dvcs.bad_icon} Source Branch: The source branch of the PR does not start with",
+                f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
             ),
             (  # Validate AAP-1234 marker format
                 'AAP-1234 this is a title',
@@ -348,6 +348,19 @@ class TestMakeDecisions:
                 f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
             ),
         ],
+        ids=[
+            "PR title is none",
+            "PR title does not match expected format",
+            "Commit is empty",
+            "Commit JIRA markers don't match PR and SB JIRA markers",
+            "Commit has no JIRA",
+            "Source branch is none",
+            "Source branch does not match jira PR",
+            "Source branch does not match expected format",
+            "Validate AAP-1234 marker format",
+            "Validate AAP-1234 marker format",
+            "Validate AAP-1234 marker format",
+        ]
     )
     def test_bad_result(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_in_message):
         result = check_dvcs.make_decisions(pr_title_jira, possible_commit_jiras, source_branch_jira)
