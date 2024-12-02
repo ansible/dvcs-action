@@ -289,13 +289,13 @@ class TestMakeDecisions:
             ),
             (  # PR title does not match expected format
                 'Title title',  # it fails on mismatch instead of the PR title, is it the correct behavior?
-                [f'{check_dvcs._NO_JIRA_MARKER}', 'Title title'],
+                [f'{check_dvcs._NO_JIRA_MARKER}'],
                 f'{check_dvcs._NO_JIRA_MARKER}',
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch ",
             ),
-            (  # Commit is empty
+            (  # Commit does not match pr title
                 'AAP-1234',
-                [None, None],
+                ['aap-3456'],
                 f'{check_dvcs._NO_JIRA_MARKER}',
                 f"* {check_dvcs.bad_icon} Mismatch: No commit with PR title JIRA number",
             ),
@@ -305,9 +305,9 @@ class TestMakeDecisions:
                 f'{check_dvcs._NO_JIRA_MARKER}',
                 f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
             ),
-            (  # Commit has no JIRA
+            (  # Commit does not have _no_jira_marker
                 f"{check_dvcs._NO_JIRA_MARKER}",  # it does not show an error message for no jira commit
-                ['This is a commit', 'this is another commit', 'this is another commit'],
+                ['aap-1234'],
                 f'{check_dvcs._NO_JIRA_MARKER}',
                 f"* {check_dvcs.bad_icon} Commit Mismatch: At least one commit is required with no_jira",
             ),
@@ -319,7 +319,7 @@ class TestMakeDecisions:
             ),
             (  # Source branch does not match jira PR
                 f"{check_dvcs._NO_JIRA_MARKER}",  # results don't show a mismatch
-                ['AAP-1234', 'this is another commit aap-1234'],
+                ['AAP-1234', 'aap-1234'],
                 'AAP-1234',
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
             ),
@@ -331,19 +331,19 @@ class TestMakeDecisions:
             ),
             (  # Validate AAP-1234 marker format
                 'AAP-1234 this is a title',
-                ['AAP-1234', 'aap-1234', 'aap-1234 this is a commit with jira numbers'],
+                ['AAP-1234', 'aap-1234', 'AAp-1234'],
                 'aap-1234 this is the source branch',
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
             ),
             (  # Validate AAP-1234 marker format
                 'AAP-1234 this is a title',
-                ['AAP-1234', 'aap-1234', 'aap-1234 this is a commit with jira numbers'],
+                ['AAP-1234', 'aap-1234', 'aAp-1234'],
                 'aap-1234 this is the source branch',
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
             ),
             (  # Validate AAP-1234 marker format
                 'ABC-0900 this is a title',
-                ['ABC-0900', 'ABC-0900', 'ABC-0900 this is a commit with jira numbers'],
+                ['ABC-0900', 'ABC-0900', 'ABC-0900'],
                 'ABC-0900 this is the source branch',
                 f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
             ),
@@ -351,16 +351,16 @@ class TestMakeDecisions:
         ids=[
             "PR title is none",
             "PR title does not match expected format",
-            "Commit is empty",
+            "Commit does not match pr title",
             "Commit JIRA markers don't match PR and SB JIRA markers",
-            "Commit has no JIRA",
+            "Commit does not have _no_jira_marker",
             "Source branch is none",
             "Source branch does not match jira PR",
             "Source branch does not match expected format",
             "Validate AAP-1234 marker format",
             "Validate AAP-1234 marker format",
             "Validate AAP-1234 marker format",
-        ]
+        ],
     )
     def test_bad_result(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_in_message):
         result = check_dvcs.make_decisions(pr_title_jira, possible_commit_jiras, source_branch_jira)
