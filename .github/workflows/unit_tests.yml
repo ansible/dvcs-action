@@ -33,15 +33,8 @@ jobs:
           name: coverage
           path: coverage.xml
 
-      - name: SonarCloud Scan (on push)
-        uses: SonarSource/sonarcloud-github-action@master
-        if: github.repository == 'ansible/dvcs-action'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
       - name: Upload jUnit XML test results
-        if: github.repository == 'ansible/dvcs-action' && github.ref_name == 'devel'
+        if: github.event_name == 'push' && github.repository == 'ansible/dvcs-action' && github.ref_name == 'devel'
         continue-on-error: true
         run: >-
           curl -v --user "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
