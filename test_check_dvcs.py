@@ -354,6 +354,12 @@ class TestMakeDecisions:
                 'ABC-0900 this is the source branch',
                 f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
             ),
+            (  # Validate AAP-1234 marker format
+                'ABC-0900 this is a title',
+                [],
+                'ABC-0900 this is the source branch',
+                f"* {check_dvcs.bad_icon} Commits: No commits with a JIRA number (AAP-[0-9]+) or NO_JIRA found!"
+            ),
         ],
         ids=[
             "PR title is none",
@@ -367,6 +373,7 @@ class TestMakeDecisions:
             "Validate AAP-1234 marker format",
             "Validate AAP-1234 marker format",
             "Validate AAP-1234 marker format",
+            "Commit: no commits with a Jira number"
         ],
     )
     def test_bad_result(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_in_message):
