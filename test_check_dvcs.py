@@ -312,26 +312,26 @@ class TestMakeDecisions:
                 f'{check_dvcs._NO_JIRA_MARKER}',
                 f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
             ),
-            (  # Commit does not have _no_jira_marker
+            (  # _NO_JIRA title does not care about anything else
                 f"{check_dvcs._NO_JIRA_MARKER}",  # it does not show an error message for no jira commit
                 ['aap-1234'],
-                f'{check_dvcs._NO_JIRA_MARKER}',
-                f"* {check_dvcs.bad_icon} Commit Mismatch: At least one commit is required with no_jira",
+                'aap-45657',
+                f"* {check_dvcs.good_icon} Title: reported no jira related",
             ),
             (  # Source branch is none
-                f"{check_dvcs._NO_JIRA_MARKER}",
+                "aap-1234",
                 [f'{check_dvcs._NO_JIRA_MARKER}'],
                 None,
                 f"* {check_dvcs.bad_icon} Source Branch: The source branch of the PR does not start with a JIRA number",
             ),
             (  # Source branch does not match jira PR
-                f"{check_dvcs._NO_JIRA_MARKER}",  # results don't show a mismatch
+                "aap-56788",  # results don't show a mismatch
                 ['AAP-1234', 'aap-1234'],
                 'AAP-1234',
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
             ),
             (  # Source branch does not match expected format
-                f"{check_dvcs._NO_JIRA_MARKER}",
+                "aap-1234",
                 [f'{check_dvcs._NO_JIRA_MARKER}'],
                 'ABCDE-1234',  # source accepts different types of JIRA formats.
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
@@ -366,7 +366,7 @@ class TestMakeDecisions:
             "PR title does not match expected format",
             "Commit does not match pr title",
             "Commit JIRA markers don't match PR and SB JIRA markers",
-            "Commit does not have _no_jira_marker",
+            "_NO_JIRA title does not care about anything else",
             "Source branch is none",
             "Source branch does not match jira PR",
             "Source branch does not match expected format",
