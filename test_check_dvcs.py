@@ -354,7 +354,7 @@ class TestMakeDecisions:
                 'ABC-0900 this is the source branch',
                 f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
             ),
-            (  # Validate AAP-1234 marker format
+            (  # Commit: no commits with a Jira number
                 'ABC-0900 this is a title',
                 [],
                 'ABC-0900 this is the source branch',
