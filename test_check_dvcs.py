@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 import requests_mock
-from requests.exceptions import MissingSchema # type: ignore
+from requests.exceptions import MissingSchema  # type: ignore
 
 import check_dvcs
 
