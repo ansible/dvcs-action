@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 import requests_mock
-from requests.exceptions import MissingSchema
+from requests.exceptions import MissingSchema # type: ignore
 
 import check_dvcs
 
@@ -372,4 +372,3 @@ class TestMakeDecisions:
     def test_bad_result(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_in_message):
         result = check_dvcs.make_decisions(pr_title_jira, possible_commit_jiras, source_branch_jira)
         assert expected_in_message in result
-        # print("Result from make_decisions:", result)
