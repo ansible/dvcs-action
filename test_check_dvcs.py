@@ -15,13 +15,15 @@ class TestDoesStringStartWithJira:
         [
             ("testing", None),
             (f'{check_dvcs._NO_JIRA_MARKER} other stuff', check_dvcs._NO_JIRA_MARKER),
-            ('AAP-1234 other stuff', 'AAP-1234'),
+            ('AAP-2222 other stuff', 'AAP-2222'),
+            ('other stuff AAP-3333', None),
+            ('other stuff AAP-4444 jira in the middle', None),
         ],
     )
     def test_does_string_start_with_jira_function(self, input, expected_return):
         result = check_dvcs.does_string_start_with_jira(input)
         assert result == expected_return
-
+        print('aqui', result)
 
 class TestGetPreviousCommentsUrls:
 
@@ -237,8 +239,6 @@ class TestMakeDecisions:
     # test scenarios (happy path)
     # PR has NO_JIRA_MARKER, Commit has NO_JIRA_MARKER, SB has NO_JIRA_MARKER,
     # PR has a valid JIRA marker, commit has a valid Jira marker, SB has a valid JIRA marker
-    # Commit has _NO_JIRA_MARKER
-    # Validate upper case/lower case JIRA markers
 
     @pytest.mark.parametrize(
         "pr_title_jira,possible_commit_jiras,source_branch_jira",
@@ -249,24 +249,9 @@ class TestMakeDecisions:
                 f'{check_dvcs._NO_JIRA_MARKER}',
             ),
             (
-                'AAP-1234',
-                ['AAP-1234', f"{check_dvcs._NO_JIRA_MARKER} no marker", 'AAP-5678 Some other marker but only one has to be valid'],
-                'aap-1234',
-            ),
-            (
-                'AAP-1234',
-                ['AAP-1234', 'AAP-1234 testing valid marker', f"{check_dvcs._NO_JIRA_MARKER} Testing valid marker"],
-                'aap-1234',
-            ),
-            (
-                'AAP-1234',
-                ['AAP-1234', 'AAP-1234 testing valid marker', 'AAP-1234 testing valid marker'],
-                'aap-1234',
-            ),
-            (
-                'aap-1234',
-                ['aap-1234', 'aap-1234 testing valid marker', 'aap-1234 testing valid marker'],
-                'aap-1234',
+                'AAP-5678',
+                ['AAP-5678', f"{check_dvcs._NO_JIRA_MARKER} no marker", 'AAP-5678'],
+                'aap-5678',
             ),
         ],
     )
@@ -336,13 +321,13 @@ class TestMakeDecisions:
                 'ABCDE-1234',  # source accepts different types of JIRA formats.
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
             ),
-            (  # Validate AAP-1234 marker format
-                'AAP-1234 this is a title',
-                ['AAP-1234', 'aap-1234', 'AAp-1234'],
-                'aap-1234 this is the source branch',
+            (  # Validate low and upper case AAP-1234 marker format
+                'AAP-9009 this is a title',
+                ['AAP-9009', 'aap-9009', 'AAp-9009'],
+                'aap-9009 this is the source branch',
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
             ),
-            (  # Validate AAP-1234 marker format
+            (  # Validate AAP-1234 same marker format
                 'AAP-1234 this is a title',
                 ['AAP-1234', 'aap-1234', 'aAp-1234'],
                 'aap-1234 this is the source branch',
@@ -370,12 +355,12 @@ class TestMakeDecisions:
             "Source branch is none",
             "Source branch does not match jira PR",
             "Source branch does not match expected format",
-            "Validate AAP-1234 marker format",
-            "Validate AAP-1234 marker format",
+            "Validate low and upper case AAP-1234 marker format",
+            "Validate AAP-1234 same marker format",
             "Validate AAP-1234 marker format",
             "Commit: no commits with a Jira number"
         ],
     )
-    def test_bad_result(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_in_message):
+    def test_decissions_output(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_in_message):
         result = check_dvcs.make_decisions(pr_title_jira, possible_commit_jiras, source_branch_jira)
         assert expected_in_message in result
