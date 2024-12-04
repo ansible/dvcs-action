@@ -23,7 +23,7 @@ class TestDoesStringStartWithJira:
     def test_does_string_start_with_jira_function(self, input, expected_return):
         result = check_dvcs.does_string_start_with_jira(input)
         assert result == expected_return
-        print('aqui', result)
+
 
 class TestGetPreviousCommentsUrls:
 
