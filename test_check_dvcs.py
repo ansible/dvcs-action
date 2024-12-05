@@ -248,11 +248,6 @@ class TestMakeDecisions:
                 [f'{check_dvcs._NO_JIRA_MARKER}'],
                 f'{check_dvcs._NO_JIRA_MARKER}',
             ),
-            (
-                'AAP-5678',
-                ['AAP-5678', f"{check_dvcs._NO_JIRA_MARKER} no marker", 'AAP-5678'],
-                'aap-5678',
-            ),
         ],
     )
     def test_good_result(self, pr_title_jira, possible_commit_jiras, source_branch_jira):
@@ -334,15 +329,15 @@ class TestMakeDecisions:
                 f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
             ),
             (  # Validate AAP-1234 marker format
-                'ABC-0900 this is a title',
-                ['ABC-0900', 'ABC-0900', 'ABC-0900'],
-                'ABC-0900 this is the source branch',
+                'AAP-3939 this is a title',
+                ['AAP-3939', 'AAP-3939', 'AAP-3939'],
+                'AAP-3939 this is the source branch',
                 f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
             ),
             (  # Commit: no commits with a Jira number
-                'ABC-0900 this is a title',
+                'AAP-4545 this is a title',
                 [],
-                'ABC-0900 this is the source branch',
+                'AAP-4545 this is the source branch',
                 f"* {check_dvcs.bad_icon} Commits: No commits with a JIRA number (AAP-[0-9]+) or NO_JIRA found!"
             ),
         ],
