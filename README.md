@@ -1,4 +1,4 @@
-# Implementing in another Repo
+# Usage
 
 This action validates the following in a PR:
 1. A commit in the pull request has the JIRA issue key in the commit message. Note, that the commit cannot be a merge commit.
