@@ -10,7 +10,7 @@ from typing import Optional
 import requests
 
 _NO_JIRA_MARKER = "NO_JIRA"
-_AAP_RE = "aap-[0-9]+"
+_AAP_RE = "AAP-[0-9]+"
 comment_preamble = "DVCS PR Check Results:"
 good_icon = "✅"
 bad_icon = "❌"
@@ -60,10 +60,10 @@ def delete_previous_comments(comments_urls: list[str]) -> None:
         raise CommandException('\n'.join(comments_that_failed_to_delete))
 
 
-def does_string_start_with_jira(string_to_match: str) -> Optional[str]:
-    pr_title_re = re.compile(f"^({_AAP_RE}|{_NO_JIRA_MARKER})", re.IGNORECASE)
+def does_string_contain_jira(string_to_match: str) -> Optional[str]:
+    pr_title_re = re.compile(f"({_AAP_RE}|{_NO_JIRA_MARKER})")
     matches = pr_title_re.match(string_to_match)
-    print(f"Checking if {string_to_match} starts with our RE ... ", end="")
+    print(f"Checking if {string_to_match} contains our RE ... ", end="")
     if not matches:
         print("Failed!")
         return None
@@ -78,7 +78,7 @@ def get_commit_jira_numbers(commit_url: str) -> list[str]:
     print(commits.status_code)
     if commits.status_code != 200:
         raise CommandException("Failed to get commits!")
-    comment_re = re.compile(rf"({_AAP_RE}|{_NO_JIRA_MARKER})", re.IGNORECASE)
+    comment_re = re.compile(rf"({_AAP_RE}|{_NO_JIRA_MARKER})")
     possible_jiras = []
     for commit in commits.json():
         # TODO: How to check if this is a merge commit or a regular comment?
@@ -93,84 +93,40 @@ def get_commit_jira_numbers(commit_url: str) -> list[str]:
     return possible_jiras
 
 
-def make_decisions(
+def does_pr_reference_ticket(
     pr_title_jira: Optional[str],
     possible_commit_jiras: list[str],
     source_branch_jira: Optional[str],
-) -> str:
-    # Lower case everything for comparison
-    if pr_title_jira is not None:
-        pr_title_jira = pr_title_jira.lower()
-    if source_branch_jira is not None:
-        source_branch_jira = source_branch_jira.lower()
-    for index in range(0, len(possible_commit_jiras)):
-        if possible_commit_jiras[index] is not None:
-            possible_commit_jiras[index] = possible_commit_jiras[index].lower()
+) -> bool:
+    """
+    Does the PR reference at least one JIRA ticket?
+
+    Although it seems to be sparsely documented, the JIRA "DVCS" plugin expects
+    *at least one* of the following:
+
+    - A ticket key (AAP-nnnnnn) in the PR title
+    - A ticket key in the branch name
+    - A ticket key in a commit message in the set of commits in the PR
+
+    It seems there is no notion of conflict handling: If multiple different
+    ticket keys are found, it will simply attach the PR to all referenced
+    tickets.
+    """
 
     print("")
-    print("Making decisions based on the following:")
+    print("Checking validity based on the following:")
     print(f"JIRA from title: {pr_title_jira}")
     print(f"JIRA from source branch: {source_branch_jira}")
     print(f"JIRAS from commits: {', '.join(possible_commit_jiras)}")
     print("")
 
-    decisions = [comment_preamble]
-    # Now make th decisions if this is in good order....
-
-    # First check the PR title
-    if not pr_title_jira:
-        # If there is no PR title JIRA report bad
-        decisions.append(f"* {bad_icon} Title: PR title does not start with a JIRA number (AAP-[0-9]+) or {_NO_JIRA_MARKER}")
-    elif pr_title_jira == _NO_JIRA_MARKER.lower():
-        # If we put the _NO_JIRA_MARKER in the title that is good enough.
-        # it provides the lowest entry barrier for community as they wouldn't have to fix branches or commit messages
-        decisions.append(f"* {good_icon} Title: reported no jira related, no other checks necessary")
-        return "\n".join(decisions)
-    else:
-        # Report the title is good
-        decisions.append(f"* {good_icon} Title: JIRA number {pr_title_jira}")
-
-    # Next check the source branch
-    if not source_branch_jira:
-        # If there is no Source Branch JIRA report bad
-        decisions.append(f"* {bad_icon} Source Branch: The source branch of the PR does not start with a JIRA number (AAP-[0-9]+) or {_NO_JIRA_MARKER}")
-    else:
-        # Report the source branch is good
-        decisions.append(f"* {good_icon} Source Branch: JIRA number {source_branch_jira}")
-
-    # Now compare the source branch to the pr title
-    if pr_title_jira is not None and source_branch_jira is not None and pr_title_jira != source_branch_jira:
-        # If we have source and title JIRAS and there is a mismatch between the title and source branch JIRAs report the mismatch
-        decisions.append(f"* {bad_icon} Mismatch: The JIRAs in the source branch {source_branch_jira} and title {pr_title_jira} do not match!")
-
-    # Finally lets check the commits
-    if len(possible_commit_jiras) == 0:
-        # If we got no commit JIRAS the commits are bad
-        decisions.append(f"* {bad_icon} Commits: No commits with a JIRA number (AAP-[0-9]+) or {_NO_JIRA_MARKER} found!")
-    elif source_branch_jira == pr_title_jira:
-        if source_branch_jira is None:
-            # If the source branch JIRA and the title JIRA are missing and we have commit JIRAS report the commits as good
-            decisions.append(f"* {good_icon} Commits: At least one JIRA number in commit messages {', '.join(possible_commit_jiras)}")
-        else:
-            # If the source branch JIRA matches the title JIRA and we have that JIRA in the commits, the commits are good
-            if source_branch_jira in possible_commit_jiras:
-                decisions.append(f"* {good_icon} Commits: At least one JIRA number in commit messages match the other JIRA numbers")
-            else:
-                decisions.append(f"* {bad_icon} Commit Mismatch: At least one commit is required with {source_branch_jira}")
-    else:
-        # If we made it here, we have commit JIRAS but we have a mismatch between the source branch and title
-        if source_branch_jira is not None and source_branch_jira not in possible_commit_jiras:
-            decisions.append(f"* {bad_icon} Mismatch: No commit with source branch JIRA number")
-        if pr_title_jira is not None and pr_title_jira not in possible_commit_jiras:
-            decisions.append(f"* {bad_icon} Mismatch: No commit with PR title JIRA number")
-
-    # Construct the new comment
-    return "\n".join(decisions)
+    # PR title or source branch is truthy means we found a regex match on the
+    # ticket key
+    # A non-empty possible_commit_jiras means at least one commit matched
+    return any([pr_title_jira, source_branch_jira, possible_commit_jiras])
 
 
 def main(args=[]):
-    global http_headers
-
     dry_run = False
 
     parser = argparse.ArgumentParser(
@@ -214,22 +170,26 @@ def main(args=[]):
             exit(255)
 
     # Check the PR title
-    pr_title_jira = does_string_start_with_jira(pull_request.get("title"))
+    pr_title_jira = does_string_contain_jira(pull_request.get("title"))
 
     # Check the PR commits
     try:
         possible_commit_jiras = get_commit_jira_numbers(pull_urls.get("commits", {}).get("href"))
     except CommandException as ce:
+        # Don't fail out in this case, if we already found a JIRA key, we might
+        # not even care about commits here.
         print(f"Failed to get commits: {ce}")
-        exit(255)
+        possible_commit_jiras = []
 
     # Check the PR source branch
-    source_branch_jira = does_string_start_with_jira(pull_request.get("head", {}).get("ref", ""))
+    source_branch_jira = does_string_contain_jira(pull_request.get("head", {}).get("ref", ""))
 
-    new_comment_body = make_decisions(pr_title_jira, possible_commit_jiras, source_branch_jira)
+    pr_is_valid = does_pr_reference_ticket(pr_title_jira, possible_commit_jiras, source_branch_jira)
 
-    print("Results:")
-    print(new_comment_body)
+    if pr_is_valid:
+        new_comment_body = "PR appears valid (JIRA key(s) found)"
+    else:
+        new_comment_body = "Could not find JIRA key(s) in PR title, branch name, or commit messages"
 
     # Post the new comment
     if not dry_run:
@@ -239,9 +199,7 @@ def main(args=[]):
         if response.status_code != 201:
             print("Failed to add new comment")
 
-    # If we had any errors, print them and exit
-    if bad_icon in new_comment_body:
-        exit(255)
+    exit(0 if pr_is_valid else 255)
 
 
 if __name__ == '__main__':

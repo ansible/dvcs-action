@@ -8,7 +8,7 @@ from requests.exceptions import MissingSchema  # type: ignore
 import check_dvcs
 
 
-class TestDoesStringStartWithJira:
+class TestDoesStringContainJira:
 
     @pytest.mark.parametrize(
         "input,expected_return",
@@ -20,8 +20,8 @@ class TestDoesStringStartWithJira:
             ('other stuff AAP-4444 jira in the middle', None),
         ],
     )
-    def test_does_string_start_with_jira_function(self, input, expected_return):
-        result = check_dvcs.does_string_start_with_jira(input)
+    def test_does_string_contain_jira_function(self, input, expected_return):
+        result = check_dvcs.does_string_contain_jira(input)
         assert result == expected_return
 
 
@@ -200,27 +200,36 @@ class TestMain:
             assert e.value.code == 255
 
     def test_fail_to_get_commits(self, capsys):
+        """
+        If we fail to get commits, don't bail out - we might have found a JIRA
+        key in the PR title or branch name that we can use instead. But still
+        report the failure to stdout.
+        """
         environ['PULL_REQUEST'] = '{"title": "junk"}'
         environ['GH_TOKEN'] = "asdf1234"
         with mock.patch('check_dvcs.get_previous_comments_urls', return_value=[]):
             with mock.patch('check_dvcs.get_commit_jira_numbers', side_effect=check_dvcs.CommandException("Failing on purpose")):
-                with pytest.raises(SystemExit) as e:
-                    check_dvcs.main()
+                with mock.patch('check_dvcs.requests.post'):
+                    try:
+                        check_dvcs.main()
+                    except SystemExit:
+                        pass  # We get to the end... This isn't what we're testing for.
                 output = capsys.readouterr()
                 assert "Failed to get commits" in output.out
-                assert e.value.code == 255
 
     def test_failed_to_add_comment(self, capsys):
         environ['PULL_REQUEST'] = '{"title": "junk", "_links": {"comments": {"href": "https://example.com"}}}'
         environ['GH_TOKEN'] = "asdf1234"
         with mock.patch('check_dvcs.get_previous_comments_urls', return_value=[]):
             with mock.patch('check_dvcs.get_commit_jira_numbers', return_value=[]):
-                with mock.patch('check_dvcs.make_decisions', return_value=""):
+                with mock.patch('check_dvcs.does_pr_reference_ticket', return_value=True):
                     with requests_mock.Mocker() as m:
                         m.register_uri('POST', 'https://example.com', status_code=404)
-                        check_dvcs.main()  # We don't raise an exception for this.
+                        with pytest.raises(SystemExit) as e:
+                            check_dvcs.main()  # We don't raise an exception for this, we exit normally
                         output = capsys.readouterr()
                         assert "Failed to add new comment" in output.out
+                        assert e.value.code == 0
 
     def test_failed_check(self):
         environ['PULL_REQUEST'] = '{"title": "junk", "_links": {"comments": {"href": "https://example.com"}}}'
@@ -234,128 +243,84 @@ class TestMain:
                     assert e.value.code == 255
 
 
-class TestMakeDecisions:
-
-    # test scenarios (happy path)
-    # PR has NO_JIRA_MARKER, Commit has NO_JIRA_MARKER, SB has NO_JIRA_MARKER,
-    # PR has a valid JIRA marker, commit has a valid Jira marker, SB has a valid JIRA marker
-
+class TestDoesPrReferenceTicket:
     @pytest.mark.parametrize(
-        "pr_title_jira,possible_commit_jiras,source_branch_jira",
+        "pr_title_jira, possible_commit_jiras, source_branch_jira, expected_result",
         [
-            (
-                f'{check_dvcs._NO_JIRA_MARKER}',
-                [f'{check_dvcs._NO_JIRA_MARKER}'],
-                f'{check_dvcs._NO_JIRA_MARKER}',
-            ),
-        ],
-    )
-    def test_good_result(self, pr_title_jira, possible_commit_jiras, source_branch_jira):
-        result = check_dvcs.make_decisions(pr_title_jira, possible_commit_jiras, source_branch_jira)
-        assert check_dvcs.bad_icon not in result
-
-        # test scenarios (broken path)
-        # PR title is none
-        # PR title does not match expected format
-        # Commit is empty
-        # Commit JIRA markers don't match PR and SB JIRA markers
-        # Commit has no JIRA
-        # Source branch is none
-        # Source branch does not match JIRA PR
-        # Source branch does not match expected format
-        # Validate AAP-1234 marker format
-
-    @pytest.mark.parametrize(
-        "pr_title_jira,possible_commit_jiras,source_branch_jira,expected_in_message",
-        [
-            (  # PR title is none
+            (  # No key in PR title, commits and source branch both have NO_JIRA
                 None,
                 [f'{check_dvcs._NO_JIRA_MARKER}'],
                 f'{check_dvcs._NO_JIRA_MARKER}',
-                f"* {check_dvcs.bad_icon} Title: PR title does not start with a JIRA number",
+                True,
             ),
-            (  # PR title does not match expected format
-                'Title title',  # it fails on mismatch instead of the PR title, is it the correct behavior?
-                [f'{check_dvcs._NO_JIRA_MARKER}'],
-                f'{check_dvcs._NO_JIRA_MARKER}',
-                f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch ",
-            ),
-            (  # Commit does not match pr title
-                'AAP-1234',
-                ['aap-3456'],
-                f'{check_dvcs._NO_JIRA_MARKER}',
-                f"* {check_dvcs.bad_icon} Mismatch: No commit with PR title JIRA number",
-            ),
-            (  # Commit JIRA markers don't match PR and SB JIRA markers
+            (  # Key in PR title, multiple in commits, key in branch name
                 'AAP-1234',
                 ['AAP-1235', 'AAP-1235'],
-                f'{check_dvcs._NO_JIRA_MARKER}',
-                f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
+                'AAP-1234',
+                True,
             ),
-            (  # _NO_JIRA title does not care about anything else
-                f"{check_dvcs._NO_JIRA_MARKER}",  # it does not show an error message for no jira commit
-                ['aap-1234'],
-                'aap-45657',
-                f"* {check_dvcs.good_icon} Title: reported no jira related",
+            (  # NO_JIRA in PR title, keys in commits and source branch
+                f"{check_dvcs._NO_JIRA_MARKER}",
+                ['AAP-1234'],
+                'AAP-45657',
+                True,
             ),
-            (  # Source branch is none
-                "aap-1234",
+            (  # Key in PR title and commit, not in branch name
+                "AAP-1234",
                 [f'{check_dvcs._NO_JIRA_MARKER}'],
                 None,
-                f"* {check_dvcs.bad_icon} Source Branch: The source branch of the PR does not start with a JIRA number",
+                True,
             ),
             (  # Source branch does not match jira PR
-                "aap-56788",  # results don't show a mismatch
-                ['AAP-1234', 'aap-1234'],
+                "AAP-56788",
+                ['AAP-1234', 'AAP-1234'],
                 'AAP-1234',
-                f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
+                True,
             ),
-            (  # Source branch does not match expected format
-                "aap-1234",
-                [f'{check_dvcs._NO_JIRA_MARKER}'],
-                'ABCDE-1234',  # source accepts different types of JIRA formats.
-                f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
-            ),
-            (  # Validate low and upper case AAP-1234 marker format
-                'AAP-9009 this is a title',
-                ['AAP-9009', 'aap-9009', 'AAp-9009'],
-                'aap-9009 this is the source branch',
-                f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
-            ),
-            (  # Validate AAP-1234 same marker format
-                'AAP-1234 this is a title',
-                ['AAP-1234', 'aap-1234', 'aAp-1234'],
-                'aap-1234 this is the source branch',
-                f"* {check_dvcs.bad_icon} Mismatch: The JIRAs in the source branch",
-            ),
-            (  # Validate AAP-1234 marker format
-                'AAP-3939 this is a title',
-                ['AAP-3939', 'AAP-3939', 'AAP-3939'],
-                'AAP-3939 this is the source branch',
-                f"* {check_dvcs.bad_icon} Mismatch: No commit with source branch JIRA number",
-            ),
-            (  # Commit: no commits with a Jira number
-                'AAP-4545 this is a title',
+            (  # Key in PR title and branch name, not in commit
+                "AAP-1234",
                 [],
-                'AAP-4545 this is the source branch',
-                f"* {check_dvcs.bad_icon} Commits: No commits with a JIRA number (AAP-[0-9]+) or NO_JIRA found!"
+                'AAP-1235',
+                True,
+            ),
+            (  # Key only in PR title
+                'AAP-9009',
+                [],
+                None,
+                True,
+            ),
+            (  # Key only in commit
+                None,
+                ['AAP-93993'],
+                None,
+                True,
+            ),
+            (  # Key only in PR title
+                None,
+                [],
+                'AAP-77888',
+                True,
+            ),
+            (  # No key in PR title, branch name, or commit.
+                None,
+                [],
+                None,
+                False,
             ),
         ],
         ids=[
-            "PR title is none",
-            "PR title does not match expected format",
-            "Commit does not match pr title",
-            "Commit JIRA markers don't match PR and SB JIRA markers",
-            "_NO_JIRA title does not care about anything else",
-            "Source branch is none",
+            "No key in PR title, commits and source branch both have NO_JIRA",
+            "Key in PR title, multiple in commits, key in branch name",
+            "NO_JIRA in PR title, keys in commits and source branch",
+            "Key in PR title and commit, not in branch name",
             "Source branch does not match jira PR",
-            "Source branch does not match expected format",
-            "Validate low and upper case AAP-1234 marker format",
-            "Validate AAP-1234 same marker format",
-            "Validate AAP-1234 marker format",
-            "Commit: no commits with a Jira number"
+            "Key in PR title and branch name, not in commit",
+            "Key only in PR title",
+            "Key only in commit",
+            "Key only in PR title",
+            "No key in PR title, branch name, or commit.",
         ],
     )
-    def test_decissions_output(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_in_message):
-        result = check_dvcs.make_decisions(pr_title_jira, possible_commit_jiras, source_branch_jira)
-        assert expected_in_message in result
+    def test_decisions_output(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_result):
+        result = check_dvcs.does_pr_reference_ticket(pr_title_jira, possible_commit_jiras, source_branch_jira)
+        assert result == expected_result
