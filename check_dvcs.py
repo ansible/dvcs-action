@@ -12,8 +12,6 @@ import requests
 _NO_JIRA_MARKER = "NO_JIRA"
 _AAP_RE = "AAP-[0-9]+"
 comment_preamble = "DVCS PR Check Results:"
-good_icon = "✅"
-bad_icon = "❌"
 http_headers = {
     "Accept": "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -186,10 +184,11 @@ def main(args=[]):
 
     pr_is_valid = does_pr_reference_ticket(pr_title_jira, possible_commit_jiras, source_branch_jira)
 
+    new_comment_body = comment_preamble
     if pr_is_valid:
-        new_comment_body = "PR appears valid (JIRA key(s) found)"
+        new_comment_body += "\n\nPR appears valid (JIRA key(s) found)"
     else:
-        new_comment_body = "Could not find JIRA key(s) in PR title, branch name, or commit messages"
+        new_comment_body += "\n\nCould not find JIRA key(s) in PR title, branch name, or commit messages"
 
     # Post the new comment
     if not dry_run:
