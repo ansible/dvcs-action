@@ -19,6 +19,10 @@ class TestDoesStringContainJira:
             ('other stuff AAP-3333', 'AAP-3333'),
             ('other stuff AAP-4444 jira in the middle', 'AAP-4444'),
             ('a-hoopy-AAP-9999-frood', 'AAP-9999'),
+            ('a-hoopy-aap-9999-frood', None),
+            ('aap-9999 hey', None),
+            ('Aap-9999 hey', None),
+            ('AAP-9999 hey', 'AAP-9999'),
         ],
     )
     def test_does_string_contain_jira_function(self, input, expected_return):
