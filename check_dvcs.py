@@ -60,7 +60,7 @@ def delete_previous_comments(comments_urls: list[str]) -> None:
 
 def does_string_contain_jira(string_to_match: str) -> Optional[str]:
     pr_title_re = re.compile(f"({_AAP_RE}|{_NO_JIRA_MARKER})")
-    matches = pr_title_re.match(string_to_match)
+    matches = pr_title_re.search(string_to_match)
     print(f"Checking if {string_to_match} contains our RE ... ", end="")
     if not matches:
         print("Failed!")
@@ -80,7 +80,7 @@ def get_commit_jira_numbers(commit_url: str) -> list[str]:
     possible_jiras = []
     for commit in commits.json():
         # TODO: How to check if this is a merge commit or a regular comment?
-        matches = comment_re.match(commit["commit"]["message"])
+        matches = comment_re.search(commit["commit"]["message"])
         print(f"Checking if {commit['commit']['message']} has a JIRA number in it ... ", end="")
         if matches:
             print(f"Good: {matches.groups()[0]}")

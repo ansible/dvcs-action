@@ -16,8 +16,9 @@ class TestDoesStringContainJira:
             ("testing", None),
             (f'{check_dvcs._NO_JIRA_MARKER} other stuff', check_dvcs._NO_JIRA_MARKER),
             ('AAP-2222 other stuff', 'AAP-2222'),
-            ('other stuff AAP-3333', None),
-            ('other stuff AAP-4444 jira in the middle', None),
+            ('other stuff AAP-3333', 'AAP-3333'),
+            ('other stuff AAP-4444 jira in the middle', 'AAP-4444'),
+            ('a-hoopy-AAP-9999-frood', 'AAP-9999'),
         ],
     )
     def test_does_string_contain_jira_function(self, input, expected_return):
@@ -244,6 +245,7 @@ class TestMain:
 
 
 class TestDoesPrReferenceTicket:
+
     @pytest.mark.parametrize(
         "pr_title_jira, possible_commit_jiras, source_branch_jira, expected_result",
         [
