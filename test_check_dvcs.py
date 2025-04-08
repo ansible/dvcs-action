@@ -327,6 +327,6 @@ class TestDoesPrReferenceTicket:
             "No key in PR title, branch name, or commit.",
         ],
     )
-    def test_decisions_output(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_result):
+    def test_does_pr_reference_ticket(self, pr_title_jira, possible_commit_jiras, source_branch_jira, expected_result):
         result = check_dvcs.does_pr_reference_ticket(pr_title_jira, possible_commit_jiras, source_branch_jira)
         assert result == expected_result
