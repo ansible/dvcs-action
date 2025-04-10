@@ -9,7 +9,6 @@ from typing import Optional
 
 import requests
 
-_NO_JIRA_MARKER = "NO_JIRA"
 _AAP_RE = "AAP-[0-9]+"
 comment_preamble = "DVCS PR Check Results:"
 http_headers = {
@@ -59,7 +58,7 @@ def delete_previous_comments(comments_urls: list[str]) -> None:
 
 
 def does_string_contain_jira(string_to_match: str) -> Optional[str]:
-    pr_title_re = re.compile(f"({_AAP_RE}|{_NO_JIRA_MARKER})")
+    pr_title_re = re.compile(f"({_AAP_RE})")
     matches = pr_title_re.search(string_to_match)
     print(f"Checking if {string_to_match} contains our RE ... ", end="")
     if not matches:
@@ -76,7 +75,7 @@ def get_commit_jira_numbers(commit_url: str) -> list[str]:
     print(commits.status_code)
     if commits.status_code != 200:
         raise CommandException("Failed to get commits!")
-    comment_re = re.compile(rf"({_AAP_RE}|{_NO_JIRA_MARKER})")
+    comment_re = re.compile(rf"({_AAP_RE})")
     possible_jiras = []
     for commit in commits.json():
         # TODO: How to check if this is a merge commit or a regular comment?

@@ -14,7 +14,6 @@ class TestDoesStringContainJira:
         "input,expected_return",
         [
             ("testing", None),
-            (f'{check_dvcs._NO_JIRA_MARKER} other stuff', check_dvcs._NO_JIRA_MARKER),
             ('AAP-2222 other stuff', 'AAP-2222'),
             ('other stuff AAP-3333', 'AAP-3333'),
             ('other stuff AAP-4444 jira in the middle', 'AAP-4444'),
@@ -135,12 +134,6 @@ class TestGitCommitJiraNumbers:
             ),
             (
                 [
-                    {"commit": {"message": f"{check_dvcs._NO_JIRA_MARKER} This has the no jira marker"}},
-                ],
-                [check_dvcs._NO_JIRA_MARKER],
-            ),
-            (
-                [
                     {"commit": {"message": "AAP-1234 This has the jira marker"}},
                 ],
                 ['AAP-1234'],
@@ -253,28 +246,10 @@ class TestDoesPrReferenceTicket:
     @pytest.mark.parametrize(
         "pr_title_jira, possible_commit_jiras, source_branch_jira, expected_result",
         [
-            (  # No key in PR title, commits and source branch both have NO_JIRA
-                None,
-                [f'{check_dvcs._NO_JIRA_MARKER}'],
-                f'{check_dvcs._NO_JIRA_MARKER}',
-                True,
-            ),
             (  # Key in PR title, multiple in commits, key in branch name
                 'AAP-1234',
                 ['AAP-1235', 'AAP-1235'],
                 'AAP-1234',
-                True,
-            ),
-            (  # NO_JIRA in PR title, keys in commits and source branch
-                f"{check_dvcs._NO_JIRA_MARKER}",
-                ['AAP-1234'],
-                'AAP-45657',
-                True,
-            ),
-            (  # Key in PR title and commit, not in branch name
-                "AAP-1234",
-                [f'{check_dvcs._NO_JIRA_MARKER}'],
-                None,
                 True,
             ),
             (  # Source branch does not match jira PR
@@ -315,10 +290,7 @@ class TestDoesPrReferenceTicket:
             ),
         ],
         ids=[
-            "No key in PR title, commits and source branch both have NO_JIRA",
             "Key in PR title, multiple in commits, key in branch name",
-            "NO_JIRA in PR title, keys in commits and source branch",
-            "Key in PR title and commit, not in branch name",
             "Source branch does not match jira PR",
             "Key in PR title and branch name, not in commit",
             "Key only in PR title",
