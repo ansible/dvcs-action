@@ -57,7 +57,10 @@ def delete_previous_comments(comments_urls: list[str]) -> None:
         raise CommandException('\n'.join(comments_that_failed_to_delete))
 
 
-def does_string_contain_jira(string_to_match: str) -> Optional[str]:
+def does_string_contain_jira(string_to_match: str, allow_no_jira: bool) -> Optional[str]:
+    if allow_no_jira and "NO_JIRA" in string_to_match:
+        print(f"NO_JIRA found in {string_to_match}")
+        return "NO_JIRA"
     pr_title_re = re.compile(f"({_AAP_RE})")
     matches = pr_title_re.search(string_to_match)
     print(f"Checking if {string_to_match} contains our RE ... ", end="")
@@ -69,21 +72,18 @@ def does_string_contain_jira(string_to_match: str) -> Optional[str]:
     return matches.groups()[0]
 
 
-def get_commit_jira_numbers(commit_url: str) -> list[str]:
+def get_commit_jira_numbers(commit_url: str, allow_no_jira: bool) -> list[str]:
     print("Getting commits ... ", end="")
     commits = requests.get(commit_url)
     print(commits.status_code)
     if commits.status_code != 200:
         raise CommandException("Failed to get commits!")
-    comment_re = re.compile(rf"({_AAP_RE})")
     possible_jiras = []
     for commit in commits.json():
         # TODO: How to check if this is a merge commit or a regular comment?
-        matches = comment_re.search(commit["commit"]["message"])
-        print(f"Checking if {commit['commit']['message']} has a JIRA number in it ... ", end="")
-        if matches:
-            print(f"Good: {matches.groups()[0]}")
-            possible_jiras.append(matches.groups()[0])
+        jira_key = does_string_contain_jira(commit["commit"]["message"], allow_no_jira)
+        if jira_key:
+            possible_jiras.append(jira_key)
         else:
             print("None detected")
 
@@ -134,9 +134,11 @@ def main(args=[]):
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument('--dry-run', action='store_true', help='Add debug messages and do not attempt to write to the PR')
+    parser.add_argument('--allow-no-jira', action='store_true', help='Allow PRs which use NO_JIRA to pass')
     args = parser.parse_args(args)
-    if hasattr(args, 'dry_run'):
-        dry_run = args.dry_run
+
+    dry_run = args.dry_run
+    allow_no_jira = args.allow_no_jira
 
     # Get and validate the data from the environment (the GitHub action should pass this in)
     try:
@@ -167,11 +169,11 @@ def main(args=[]):
             exit(255)
 
     # Check the PR title
-    pr_title_jira = does_string_contain_jira(pull_request.get("title"))
+    pr_title_jira = does_string_contain_jira(pull_request.get("title"), allow_no_jira)
 
     # Check the PR commits
     try:
-        possible_commit_jiras = get_commit_jira_numbers(pull_urls.get("commits", {}).get("href"))
+        possible_commit_jiras = get_commit_jira_numbers(pull_urls.get("commits", {}).get("href"), allow_no_jira)
     except CommandException as ce:
         # Don't fail out in this case, if we already found a JIRA key, we might
         # not even care about commits here.
@@ -179,7 +181,7 @@ def main(args=[]):
         possible_commit_jiras = []
 
     # Check the PR source branch
-    source_branch_jira = does_string_contain_jira(pull_request.get("head", {}).get("ref", ""))
+    source_branch_jira = does_string_contain_jira(pull_request.get("head", {}).get("ref", ""), allow_no_jira)
 
     pr_is_valid = does_pr_reference_ticket(pr_title_jira, possible_commit_jiras, source_branch_jira)
 
