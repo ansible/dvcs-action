@@ -134,11 +134,12 @@ def main(args=[]):
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument('--dry-run', action='store_true', help='Add debug messages and do not attempt to write to the PR')
-    parser.add_argument('--allow-no-jira', action='store_true', help='Allow PRs which use NO_JIRA to pass')
+    parser.add_argument('--allow-no-jira', help='Allow PRs which use NO_JIRA to pass (true or false)')
     args = parser.parse_args(args)
 
     dry_run = args.dry_run
-    allow_no_jira = args.allow_no_jira
+    allow_no_jira = args.allow_no_jira == "true"
+    print(f"allow_no_jira: {allow_no_jira}")
 
     # Get and validate the data from the environment (the GitHub action should pass this in)
     try:
