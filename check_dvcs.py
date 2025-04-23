@@ -23,7 +23,7 @@ class CommandException(Exception):
 
 def get_previous_comments_urls(comments_url) -> list[str]:
     # Load the existing comments
-    print("Getting comments ... ", end="")
+    print(f"Getting comments ({comments_url}) ... ", end="")
     comments = requests.get(comments_url)
     print(comments.status_code)
     if comments.status_code != 200:
@@ -47,7 +47,7 @@ def delete_previous_comments(comments_urls: list[str]) -> None:
 
     comments_that_failed_to_delete = []
     for url in comments_urls:
-        print("Deleting old comment ... ", end="")
+        print(f"Deleting old comment ({url}) ... ", end="")
         response = requests.delete(url, headers=http_headers)
         print(response.status_code)
         if response.status_code not in [204, 404]:
@@ -73,7 +73,7 @@ def does_string_contain_jira(string_to_match: str, allow_no_jira: bool) -> Optio
 
 
 def get_commit_jira_numbers(commit_url: str, allow_no_jira: bool) -> list[str]:
-    print("Getting commits ... ", end="")
+    print(f"Getting commits ({commit_url}) ... ", end="")
     commits = requests.get(commit_url)
     print(commits.status_code)
     if commits.status_code != 200:
@@ -194,7 +194,7 @@ def main(args=[]):
 
     # Post the new comment
     if not dry_run:
-        print("Creating new comment ... ", end="")
+        print(f"Creating new comment ({comments_url}) ... ", end="")
         response = requests.post(comments_url, json={"body": new_comment_body}, headers=http_headers)
         print(response.status_code)
         if response.status_code != 201:
