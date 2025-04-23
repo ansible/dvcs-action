@@ -24,7 +24,7 @@ class CommandException(Exception):
 def get_previous_comments_urls(comments_url) -> list[str]:
     # Load the existing comments
     print(f"Getting comments ({comments_url}) ... ", end="")
-    comments = requests.get(comments_url)
+    comments = requests.get(comments_url, headers=http_headers)
     print(comments.status_code)
     if comments.status_code != 200:
         raise CommandException("Failed to get existing comments!")
@@ -74,7 +74,7 @@ def does_string_contain_jira(string_to_match: str, allow_no_jira: bool) -> Optio
 
 def get_commit_jira_numbers(commit_url: str, allow_no_jira: bool) -> list[str]:
     print(f"Getting commits ({commit_url}) ... ", end="")
-    commits = requests.get(commit_url)
+    commits = requests.get(commit_url, headers=http_headers)
     print(commits.status_code)
     if commits.status_code != 200:
         raise CommandException("Failed to get commits!")
