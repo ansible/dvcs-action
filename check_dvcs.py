@@ -9,7 +9,6 @@ from typing import Optional
 
 import requests
 
-_NO_JIRA_MARKER = "NO_JIRA"
 _AAP_RE = "AAP-[0-9]+"
 comment_preamble = "DVCS PR Check Results:"
 http_headers = {
@@ -24,8 +23,8 @@ class CommandException(Exception):
 
 def get_previous_comments_urls(comments_url) -> list[str]:
     # Load the existing comments
-    print("Getting comments ... ", end="")
-    comments = requests.get(comments_url)
+    print(f"Getting comments ({comments_url}) ... ", end="")
+    comments = requests.get(comments_url, headers=http_headers)
     print(comments.status_code)
     if comments.status_code != 200:
         raise CommandException("Failed to get existing comments!")
@@ -48,7 +47,7 @@ def delete_previous_comments(comments_urls: list[str]) -> None:
 
     comments_that_failed_to_delete = []
     for url in comments_urls:
-        print("Deleting old comment ... ", end="")
+        print(f"Deleting old comment ({url}) ... ", end="")
         response = requests.delete(url, headers=http_headers)
         print(response.status_code)
         if response.status_code not in [204, 404]:
@@ -58,8 +57,11 @@ def delete_previous_comments(comments_urls: list[str]) -> None:
         raise CommandException('\n'.join(comments_that_failed_to_delete))
 
 
-def does_string_contain_jira(string_to_match: str) -> Optional[str]:
-    pr_title_re = re.compile(f"({_AAP_RE}|{_NO_JIRA_MARKER})")
+def does_string_contain_jira(string_to_match: str, allow_no_jira: bool) -> Optional[str]:
+    if allow_no_jira and "NO_JIRA" in string_to_match:
+        print(f"NO_JIRA found in {string_to_match}")
+        return "NO_JIRA"
+    pr_title_re = re.compile(f"({_AAP_RE})")
     matches = pr_title_re.search(string_to_match)
     print(f"Checking if {string_to_match} contains our RE ... ", end="")
     if not matches:
@@ -70,21 +72,18 @@ def does_string_contain_jira(string_to_match: str) -> Optional[str]:
     return matches.groups()[0]
 
 
-def get_commit_jira_numbers(commit_url: str) -> list[str]:
-    print("Getting commits ... ", end="")
-    commits = requests.get(commit_url)
+def get_commit_jira_numbers(commit_url: str, allow_no_jira: bool) -> list[str]:
+    print(f"Getting commits ({commit_url}) ... ", end="")
+    commits = requests.get(commit_url, headers=http_headers)
     print(commits.status_code)
     if commits.status_code != 200:
         raise CommandException("Failed to get commits!")
-    comment_re = re.compile(rf"({_AAP_RE}|{_NO_JIRA_MARKER})")
     possible_jiras = []
     for commit in commits.json():
         # TODO: How to check if this is a merge commit or a regular comment?
-        matches = comment_re.search(commit["commit"]["message"])
-        print(f"Checking if {commit['commit']['message']} has a JIRA number in it ... ", end="")
-        if matches:
-            print(f"Good: {matches.groups()[0]}")
-            possible_jiras.append(matches.groups()[0])
+        jira_key = does_string_contain_jira(commit["commit"]["message"], allow_no_jira)
+        if jira_key:
+            possible_jiras.append(jira_key)
         else:
             print("None detected")
 
@@ -135,9 +134,12 @@ def main(args=[]):
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument('--dry-run', action='store_true', help='Add debug messages and do not attempt to write to the PR')
+    parser.add_argument('--allow-no-jira', help='Allow PRs which use NO_JIRA to pass (true or false)')
     args = parser.parse_args(args)
-    if hasattr(args, 'dry_run'):
-        dry_run = args.dry_run
+
+    dry_run = args.dry_run
+    allow_no_jira = args.allow_no_jira == "true"
+    print(f"allow_no_jira: {allow_no_jira}")
 
     # Get and validate the data from the environment (the GitHub action should pass this in)
     try:
@@ -168,11 +170,11 @@ def main(args=[]):
             exit(255)
 
     # Check the PR title
-    pr_title_jira = does_string_contain_jira(pull_request.get("title"))
+    pr_title_jira = does_string_contain_jira(pull_request.get("title"), allow_no_jira)
 
     # Check the PR commits
     try:
-        possible_commit_jiras = get_commit_jira_numbers(pull_urls.get("commits", {}).get("href"))
+        possible_commit_jiras = get_commit_jira_numbers(pull_urls.get("commits", {}).get("href"), allow_no_jira)
     except CommandException as ce:
         # Don't fail out in this case, if we already found a JIRA key, we might
         # not even care about commits here.
@@ -180,7 +182,7 @@ def main(args=[]):
         possible_commit_jiras = []
 
     # Check the PR source branch
-    source_branch_jira = does_string_contain_jira(pull_request.get("head", {}).get("ref", ""))
+    source_branch_jira = does_string_contain_jira(pull_request.get("head", {}).get("ref", ""), allow_no_jira)
 
     pr_is_valid = does_pr_reference_ticket(pr_title_jira, possible_commit_jiras, source_branch_jira)
 
@@ -192,7 +194,7 @@ def main(args=[]):
 
     # Post the new comment
     if not dry_run:
-        print("Creating new comment ... ", end="")
+        print(f"Creating new comment ({comments_url}) ... ", end="")
         response = requests.post(comments_url, json={"body": new_comment_body}, headers=http_headers)
         print(response.status_code)
         if response.status_code != 201:

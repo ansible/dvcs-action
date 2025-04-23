@@ -11,22 +11,34 @@ import check_dvcs
 class TestDoesStringContainJira:
 
     @pytest.mark.parametrize(
-        "input,expected_return",
+        "input,allow_no_jira,expected_return",
         [
-            ("testing", None),
-            (f'{check_dvcs._NO_JIRA_MARKER} other stuff', check_dvcs._NO_JIRA_MARKER),
-            ('AAP-2222 other stuff', 'AAP-2222'),
-            ('other stuff AAP-3333', 'AAP-3333'),
-            ('other stuff AAP-4444 jira in the middle', 'AAP-4444'),
-            ('a-hoopy-AAP-9999-frood', 'AAP-9999'),
-            ('a-hoopy-aap-9999-frood', None),
-            ('aap-9999 hey', None),
-            ('Aap-9999 hey', None),
-            ('AAP-9999 hey', 'AAP-9999'),
+            ("testing", True, None),
+            ("testing", False, None),
+            ('AAP-2222 other stuff', True, 'AAP-2222'),
+            ('AAP-2222 other stuff', False, 'AAP-2222'),
+            ('other stuff AAP-3333', True, 'AAP-3333'),
+            ('other stuff AAP-3333', False, 'AAP-3333'),
+            ('other stuff AAP-4444 jira in the middle', True, 'AAP-4444'),
+            ('other stuff AAP-4444 jira in the middle', False, 'AAP-4444'),
+            ('a-hoopy-AAP-9999-frood', True, 'AAP-9999'),
+            ('a-hoopy-AAP-9999-frood', False, 'AAP-9999'),
+            ('a-hoopy-aap-9999-frood', True, None),
+            ('a-hoopy-aap-9999-frood', False, None),
+            ('aap-9999 hey', True, None),
+            ('aap-9999 hey', False, None),
+            ('Aap-9999 hey', True, None),
+            ('Aap-9999 hey', False, None),
+            ('AAP-9999 hey', True, 'AAP-9999'),
+            ('AAP-9999 hey', False, 'AAP-9999'),
+            ('NO_JIRA hey', True, 'NO_JIRA'),
+            ('NO_JIRA hey', False, None),
+            ('[NO_JIRA] hey', True, 'NO_JIRA'),
+            ('[NO_JIRA] hey', False, None),
         ],
     )
-    def test_does_string_contain_jira_function(self, input, expected_return):
-        result = check_dvcs.does_string_contain_jira(input)
+    def test_does_string_contain_jira_function(self, input, allow_no_jira, expected_return):
+        result = check_dvcs.does_string_contain_jira(input, allow_no_jira)
         assert result == expected_return
 
 
@@ -115,48 +127,88 @@ class TestGitCommitJiraNumbers:
 
     def test_invalid_url(self):
         with pytest.raises(MissingSchema):
-            check_dvcs.get_commit_jira_numbers("www.example.com")
+            check_dvcs.get_commit_jira_numbers("www.example.com", True)
 
     def test_invalid_status_code(self):
         with pytest.raises(check_dvcs.CommandException):
             with requests_mock.Mocker() as m:
                 m.register_uri('GET', 'https://example.com', status_code=404)
-                check_dvcs.get_commit_jira_numbers("https://example.com")
+                check_dvcs.get_commit_jira_numbers("https://example.com", True)
 
     @pytest.mark.parametrize(
-        "json,expected_result",
+        "json,allow_no_jira,expected_result",
         [
-            ([], []),
+            ([], True, []),
+            ([], False, []),
             (
                 [
                     {"commit": {"message": "This is wrong"}},
                 ],
+                True,
                 [],
             ),
             (
                 [
-                    {"commit": {"message": f"{check_dvcs._NO_JIRA_MARKER} This has the no jira marker"}},
+                    {"commit": {"message": "This is wrong"}},
                 ],
-                [check_dvcs._NO_JIRA_MARKER],
+                False,
+                [],
             ),
             (
                 [
                     {"commit": {"message": "AAP-1234 This has the jira marker"}},
                 ],
+                True,
                 ['AAP-1234'],
+            ),
+            (
+                [
+                    {"commit": {"message": "AAP-1234 This has the jira marker"}},
+                ],
+                False,
+                ['AAP-1234'],
+            ),
+            (
+                [
+                    {"commit": {"message": "NO_JIRA This has the no_jira marker"}},
+                ],
+                False,
+                [],
+            ),
+            (
+                [
+                    {"commit": {"message": "NO_JIRA This has the no_jira marker"}},
+                ],
+                True,
+                ['NO_JIRA'],
+            ),
+            (
+                [
+                    {"commit": {"message": "[NO_JIRA] This has the no_jira marker in brackets"}},
+                ],
+                False,
+                [],
+            ),
+            (
+                [
+                    {"commit": {"message": "[NO_JIRA] This has the no_jira marker in brackets"}},
+                ],
+                True,
+                ['NO_JIRA'],
             ),
             (
                 [
                     {"commit": {"message": "ABC-0909 This has wrong jira marker format"}},
                 ],
+                True,
                 [],
             ),
         ],
     )
-    def test_json_return(self, json, expected_result):
+    def test_json_return(self, json, allow_no_jira, expected_result):
         with requests_mock.Mocker() as m:
             m.register_uri('GET', 'https://example.com', status_code=200, json=json)
-            response = check_dvcs.get_commit_jira_numbers("https://example.com")
+            response = check_dvcs.get_commit_jira_numbers("https://example.com", allow_no_jira)
             assert response == expected_result
 
 
@@ -253,28 +305,10 @@ class TestDoesPrReferenceTicket:
     @pytest.mark.parametrize(
         "pr_title_jira, possible_commit_jiras, source_branch_jira, expected_result",
         [
-            (  # No key in PR title, commits and source branch both have NO_JIRA
-                None,
-                [f'{check_dvcs._NO_JIRA_MARKER}'],
-                f'{check_dvcs._NO_JIRA_MARKER}',
-                True,
-            ),
             (  # Key in PR title, multiple in commits, key in branch name
                 'AAP-1234',
                 ['AAP-1235', 'AAP-1235'],
                 'AAP-1234',
-                True,
-            ),
-            (  # NO_JIRA in PR title, keys in commits and source branch
-                f"{check_dvcs._NO_JIRA_MARKER}",
-                ['AAP-1234'],
-                'AAP-45657',
-                True,
-            ),
-            (  # Key in PR title and commit, not in branch name
-                "AAP-1234",
-                [f'{check_dvcs._NO_JIRA_MARKER}'],
-                None,
                 True,
             ),
             (  # Source branch does not match jira PR
@@ -315,10 +349,7 @@ class TestDoesPrReferenceTicket:
             ),
         ],
         ids=[
-            "No key in PR title, commits and source branch both have NO_JIRA",
             "Key in PR title, multiple in commits, key in branch name",
-            "NO_JIRA in PR title, keys in commits and source branch",
-            "Key in PR title and commit, not in branch name",
             "Source branch does not match jira PR",
             "Key in PR title and branch name, not in commit",
             "Key only in PR title",
