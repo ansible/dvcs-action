@@ -148,7 +148,7 @@ def main(args=[]):
         print(f"Failed to load json from string: {jde}")
         exit(255)
 
-    print(f"Running DVCS v3 in dry-run={dry_run}")
+    print(f"Running DVCS v5 in dry-run={dry_run}")
 
     if not dry_run:
         GITHUB_TOKEN = getenv("GH_TOKEN")
