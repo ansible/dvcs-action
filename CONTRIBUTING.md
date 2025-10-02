@@ -27,9 +27,29 @@ We are very happy to receive contributions from the community in any form!
 
 Please use a GitHub pull request to submit your contributions. If you have a
 question or are unsure if a contribution is wanted, please join us in
-[TBD](#channel-name-here) on Matrix to discuss your change or on the Ansible forum 
-using the TBD tag if you prefer async discussion. 
+[TBD](#channel-name-here) on Matrix to discuss your change or on the Ansible forum
+using the TBD tag if you prefer async discussion.
 Open a GitHub issue to report bugs or request features.
+
+## Running tests
+
+This project uses [tox](https://tox.wiki/) for testing. To run tests:
+
+```bash
+# Run all default environments (check and py311)
+tox
+
+# Run specific test environments
+tox -e py311        # Run pytest with coverage
+tox -e flake8       # Run flake8 linter
+tox -e black        # Run black formatter
+tox -e isort        # Run isort import sorter
+
+# Run using labels
+tox -m test         # Run py311 tests
+tox -m check        # Run check environment
+tox -m lint         # Run all linters (flake8, black, isort)
+```
 
 ## Governance
 
