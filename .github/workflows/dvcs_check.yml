@@ -11,3 +11,6 @@ jobs:
     name: Check the PR for DVCS integration
     steps:
       - uses: ansible/dvcs-action@devel
+        with:
+          allow_no_jira: true
+
