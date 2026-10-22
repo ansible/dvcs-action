@@ -42,87 +42,6 @@ class TestDoesStringContainJira:
         assert result == expected_return
 
 
-class TestGetPreviousCommentsUrls:
-
-    def test_invalid_url(self):
-        with pytest.raises(MissingSchema):
-            check_dvcs.get_previous_comments_urls("www.example.com")
-
-    def test_invalid_status_code(self):
-        with pytest.raises(check_dvcs.CommandException):
-            with requests_mock.Mocker() as m:
-                m.register_uri('GET', 'https://example.com', status_code=404)
-                check_dvcs.get_previous_comments_urls("https://example.com")
-
-    @pytest.mark.parametrize(
-        "json,expected_result",
-        [
-            ([], []),
-            (
-                [
-                    {
-                        "body": "This comment does not match",
-                        "url": "https://example.com/1",
-                    },
-                ],
-                [],
-            ),
-            (
-                [
-                    {
-                        "body": f"{check_dvcs.comment_preamble} This comment should match",
-                        "url": "https://example.com/1",
-                    },
-                ],
-                ["https://example.com/1"],
-            ),
-        ],
-    )
-    def test_valid_json(self, json, expected_result):
-        with requests_mock.Mocker() as m:
-            m.register_uri('GET', 'https://example.com', status_code=200, json=json)
-            response = check_dvcs.get_previous_comments_urls("https://example.com")
-            assert response == expected_result
-
-
-class TestDeletePreviousComments:
-
-    def test_missing_header(self):
-        with pytest.raises(check_dvcs.CommandException) as ce:
-            check_dvcs.delete_previous_comments([])
-        assert 'Auth header missing' in str(ce.value)
-
-    def test_good_delete(self):
-        base_url = 'https://example.com/'
-        with requests_mock.Mocker() as m:
-            m.register_uri('DELETE', f'{base_url}1', status_code=404)
-            m.register_uri('DELETE', f'{base_url}2', status_code=204)
-            check_dvcs.http_headers['Authorization'] = 'Bearer 1234'
-            check_dvcs.delete_previous_comments([f'{base_url}1', f'{base_url}2'])
-
-    def test_bad_deletes(self):
-        base_url = 'https://example.com/'
-        with requests_mock.Mocker() as m:
-            m.register_uri('DELETE', f'{base_url}1', status_code=500)
-            m.register_uri('DELETE', f'{base_url}2', status_code=201)
-            m.register_uri('DELETE', f'{base_url}3', status_code=404)
-            m.register_uri('DELETE', f'{base_url}4', status_code=204)
-            with pytest.raises(check_dvcs.CommandException) as ce:
-                check_dvcs.http_headers['Authorization'] = 'Bearer 1234'
-                check_dvcs.delete_previous_comments(
-                    [
-                        f'{base_url}1',
-                        f'{base_url}2',
-                        f'{base_url}3',
-                        f'{base_url}4',
-                    ]
-                )
-            assert f'{base_url}1' in str(ce.value)
-            assert f'{base_url}2' in str(ce.value)
-            assert f'{base_url}3' not in str(ce.value)
-            assert f'{base_url}4' not in str(ce.value)
-
-
 class TestGitCommitJiraNumbers:
 
     def test_invalid_url(self):
@@ -229,33 +148,6 @@ class TestMain:
         assert "Failed to load json from string" in output.out
         assert e.value.code == 255
 
-    @pytest.mark.parametrize(
-        "token",
-        [
-            None,
-            "",
-        ],
-    )
-    def test_github_invalid_token(self, capsys, token):
-        environ['PULL_REQUEST'] = "{}"
-        if token:
-            environ['GH_TOKEN'] = token
-        with pytest.raises(SystemExit) as e:
-            check_dvcs.main()
-        output = capsys.readouterr()
-        assert "Did not get a github token, failing" in output.out
-        assert e.value.code == 255
-
-    def test_delete_previous_commit_fails(self, capsys):
-        environ['PULL_REQUEST'] = "{}"
-        environ['GH_TOKEN'] = "asdf1234"
-        with mock.patch('check_dvcs.get_previous_comments_urls', side_effect=check_dvcs.CommandException("Failing on purpose")):
-            with pytest.raises(SystemExit) as e:
-                check_dvcs.main()
-            output = capsys.readouterr()
-            assert "Failed to delete one or more comments" in output.out
-            assert e.value.code == 255
-
     def test_fail_to_get_commits(self, capsys):
         """
         If we fail to get commits, don't bail out - we might have found a JIRA
@@ -263,41 +155,20 @@ class TestMain:
         report the failure to stdout.
         """
         environ['PULL_REQUEST'] = '{"title": "junk"}'
-        environ['GH_TOKEN'] = "asdf1234"
-        with mock.patch('check_dvcs.get_previous_comments_urls', return_value=[]):
-            with mock.patch('check_dvcs.get_commit_jira_numbers', side_effect=check_dvcs.CommandException("Failing on purpose")):
-                with mock.patch('check_dvcs.requests.post'):
-                    try:
-                        check_dvcs.main()
-                    except SystemExit:
-                        pass  # We get to the end... This isn't what we're testing for.
-                output = capsys.readouterr()
-                assert "Failed to get commits" in output.out
-
-    def test_failed_to_add_comment(self, capsys):
-        environ['PULL_REQUEST'] = '{"title": "junk", "_links": {"comments": {"href": "https://example.com"}}}'
-        environ['GH_TOKEN'] = "asdf1234"
-        with mock.patch('check_dvcs.get_previous_comments_urls', return_value=[]):
-            with mock.patch('check_dvcs.get_commit_jira_numbers', return_value=[]):
-                with mock.patch('check_dvcs.does_pr_reference_ticket', return_value=True):
-                    with requests_mock.Mocker() as m:
-                        m.register_uri('POST', 'https://example.com', status_code=404)
-                        with pytest.raises(SystemExit) as e:
-                            check_dvcs.main()  # We don't raise an exception for this, we exit normally
-                        output = capsys.readouterr()
-                        assert "Failed to add new comment" in output.out
-                        assert e.value.code == 0
+        with mock.patch('check_dvcs.get_commit_jira_numbers', side_effect=check_dvcs.CommandException("Failing on purpose")):
+            try:
+                check_dvcs.main()
+            except SystemExit:
+                pass  # We get to the end... This isn't what we're testing for.
+            output = capsys.readouterr()
+            assert "Failed to get commits" in output.out
 
     def test_failed_check(self):
-        environ['PULL_REQUEST'] = '{"title": "junk", "_links": {"comments": {"href": "https://example.com"}}}'
-        environ['GH_TOKEN'] = "asdf1234"
-        with mock.patch('check_dvcs.get_previous_comments_urls', return_value=[]):
-            with mock.patch('check_dvcs.get_commit_jira_numbers', return_value=[]):
-                with requests_mock.Mocker() as m:
-                    m.register_uri('POST', 'https://example.com', status_code=201)
-                    with pytest.raises(SystemExit) as e:
-                        check_dvcs.main()
-                    assert e.value.code == 255
+        environ['PULL_REQUEST'] = '{"title": "junk"}'
+        with mock.patch('check_dvcs.get_commit_jira_numbers', return_value=[]):
+            with pytest.raises(SystemExit) as e:
+                check_dvcs.main()
+            assert e.value.code == 255
 
 
 class TestDoesPrReferenceTicket:
