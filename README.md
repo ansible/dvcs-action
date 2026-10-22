@@ -14,15 +14,15 @@ jobs:
   dvcs_pr_checker:
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: read
     runs-on: ubuntu-latest
     name: Check the PR for DVCS integration
     steps:
       - id: foo
-        uses: ansible/dvcs-action@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        uses: ansible/dvcs-action@v6
 ```
+
+This action is read-only. It validates the pull request without modifying it, so the calling workflow only needs read permissions.
 
 
 # Testing locally
@@ -33,11 +33,9 @@ This can be accomplished by doing a curl command (change <repo> and <pull number
 export PULL_REQUEST=$(curl https://api.github.com/repos/ansible/<repo>/pulls/<pull number>)
 ```
 
-After that is set you can run the python scrip with the `--dry-run` command to prevent it from trying to update the PR you are testing:
+After that is set you can run the Python script:
 ```
-./check_dvcs.py --dry-run
+./check_dvcs.py
 ```
-
-This will add additional debugging statements as well as not trying to modify the PR.
 
 NOTE: this will use unauthenticated GitHub API requests which are throttled by default. If you hit your limit you will need to wait until your counter resets to test again.
