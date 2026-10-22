@@ -10,7 +10,6 @@ from typing import Optional
 import requests
 
 _AAP_RE = "AAP-[0-9]+"
-comment_preamble = "DVCS PR Check Results:"
 http_headers = {
     "Accept": "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -19,42 +18,6 @@ http_headers = {
 
 class CommandException(Exception):
     pass
-
-
-def get_previous_comments_urls(comments_url) -> list[str]:
-    # Load the existing comments
-    print(f"Getting comments ({comments_url}) ... ", end="")
-    comments = requests.get(comments_url, headers=http_headers)
-    print(comments.status_code)
-    if comments.status_code != 200:
-        raise CommandException("Failed to get existing comments!")
-
-    response = []
-    for comment in comments.json():
-        print(f"Checking if {comment['body']} starts with {comment_preamble} ... ", end="")
-        if comment["body"].startswith(comment_preamble):
-            response.append(comment["url"])
-            print("Good!")
-        else:
-            print("Failed")
-
-    return response
-
-
-def delete_previous_comments(comments_urls: list[str]) -> None:
-    if 'Authorization' not in http_headers:
-        raise CommandException("Auth header missing, can't delete old comments!")
-
-    comments_that_failed_to_delete = []
-    for url in comments_urls:
-        print(f"Deleting old comment ({url}) ... ", end="")
-        response = requests.delete(url, headers=http_headers)
-        print(response.status_code)
-        if response.status_code not in [204, 404]:
-            comments_that_failed_to_delete.append(url)
-
-    if len(comments_that_failed_to_delete) > 0:
-        raise CommandException('\n'.join(comments_that_failed_to_delete))
 
 
 def does_string_contain_jira(string_to_match: str, allow_no_jira: bool) -> Optional[str]:
@@ -124,8 +87,6 @@ def does_pr_reference_ticket(
 
 
 def main(args=[]):
-    dry_run = False
-
     parser = argparse.ArgumentParser(
         description="A tool for checking if a PR matches the DVCS rules.\n\n"
         "This program requires the body of the pull request as an environment variable PULL_REQUEST.\n"
@@ -133,11 +94,9 @@ def main(args=[]):
         add_help=True,
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    parser.add_argument('--dry-run', action='store_true', help='Add debug messages and do not attempt to write to the PR')
     parser.add_argument('--allow-no-jira', help='Allow PRs which use NO_JIRA to pass (true or false)')
     args = parser.parse_args(args)
 
-    dry_run = args.dry_run
     allow_no_jira = args.allow_no_jira == "true"
     print(f"allow_no_jira: {allow_no_jira}")
 
@@ -148,26 +107,9 @@ def main(args=[]):
         print(f"Failed to load json from string: {jde}")
         exit(255)
 
-    print(f"Running DVCS v5 in dry-run={dry_run}")
-
-    if not dry_run:
-        GITHUB_TOKEN = getenv("GH_TOKEN")
-        if not GITHUB_TOKEN:
-            print("Did not get a github token, failing!")
-            exit(255)
-        print("Added authentication to headers")
-        http_headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    print("Running DVCS v6")
 
     pull_urls = pull_request.get("_links", {})
-    comments_url = pull_request.get("_links", {}).get("comments", {}).get("href")
-
-    if not dry_run:
-        try:
-            delete_previous_comments(get_previous_comments_urls(comments_url))
-        except CommandException as ce:
-            print("Failed to delete one or more comments:")
-            print(ce)
-            exit(255)
 
     # Check the PR title
     pr_title_jira = does_string_contain_jira(pull_request.get("title"), allow_no_jira)
@@ -185,20 +127,6 @@ def main(args=[]):
     source_branch_jira = does_string_contain_jira(pull_request.get("head", {}).get("ref", ""), allow_no_jira)
 
     pr_is_valid = does_pr_reference_ticket(pr_title_jira, possible_commit_jiras, source_branch_jira)
-
-    new_comment_body = comment_preamble
-    if pr_is_valid:
-        new_comment_body += "\n\nPR appears valid (JIRA key(s) found)"
-    else:
-        new_comment_body += "\n\nCould not find JIRA key(s) in PR title, branch name, or commit messages"
-
-    # Post the new comment
-    if not dry_run:
-        print(f"Creating new comment ({comments_url}) ... ", end="")
-        response = requests.post(comments_url, json={"body": new_comment_body}, headers=http_headers)
-        print(response.status_code)
-        if response.status_code != 201:
-            print("Failed to add new comment")
 
     exit(0 if pr_is_valid else 255)
 

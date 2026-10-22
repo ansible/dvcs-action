@@ -6,10 +6,8 @@ jobs:
   dvcs_pr_checker:
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: read
     runs-on: ubuntu-latest
     name: Check the PR for DVCS integration
     steps:
       - uses: ansible/dvcs-action@devel
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
