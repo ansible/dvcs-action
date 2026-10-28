@@ -20,6 +20,14 @@ class CommandException(Exception):
     pass
 
 
+def get_http_headers() -> dict[str, str]:
+    headers = http_headers.copy()
+    github_token = getenv("GITHUB_TOKEN")
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
+    return headers
+
+
 def does_string_contain_jira(string_to_match: str, allow_no_jira: bool) -> Optional[str]:
     if allow_no_jira and "NO_JIRA" in string_to_match:
         print(f"NO_JIRA found in {string_to_match}")
@@ -37,7 +45,7 @@ def does_string_contain_jira(string_to_match: str, allow_no_jira: bool) -> Optio
 
 def get_commit_jira_numbers(commit_url: str, allow_no_jira: bool) -> list[str]:
     print(f"Getting commits ({commit_url}) ... ", end="")
-    commits = requests.get(commit_url, headers=http_headers)
+    commits = requests.get(commit_url, headers=get_http_headers())
     print(commits.status_code)
     if commits.status_code != 200:
         raise CommandException("Failed to get commits!")
@@ -106,6 +114,9 @@ def main(args=[]):
     except json.JSONDecodeError as jde:
         print(f"Failed to load json from string: {jde}")
         exit(255)
+
+    if not getenv("GITHUB_TOKEN"):
+        print("Warning: did not get a GitHub token; continuing without authentication.")
 
     print("Running DVCS v6")
 
