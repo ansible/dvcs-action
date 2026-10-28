@@ -183,14 +183,15 @@ class TestMain:
 
     def test_missing_github_token(self, monkeypatch, capsys):
         monkeypatch.delenv("GITHUB_TOKEN")
-        environ['PULL_REQUEST'] = '{"title": "junk"}'
+        environ['PULL_REQUEST'] = '{"title": "AAP-1234"}'
 
-        with pytest.raises(SystemExit) as e:
-            check_dvcs.main()
+        with mock.patch('check_dvcs.get_commit_jira_numbers', return_value=[]):
+            with pytest.raises(SystemExit) as e:
+                check_dvcs.main()
 
         output = capsys.readouterr()
-        assert "Did not get a GitHub token" in output.out
-        assert e.value.code == 255
+        assert "Warning: did not get a GitHub token" in output.out
+        assert e.value.code == 0
 
 
 class TestDoesPrReferenceTicket:

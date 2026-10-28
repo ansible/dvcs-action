@@ -116,8 +116,7 @@ def main(args=[]):
         exit(255)
 
     if not getenv("GITHUB_TOKEN"):
-        print("Did not get a GitHub token, failing!")
-        exit(255)
+        print("Warning: did not get a GitHub token; continuing without authentication.")
 
     print("Running DVCS v6")
 
