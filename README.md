@@ -30,7 +30,8 @@ This action is read-only. It validates the pull request without modifying it, so
 In order to test locally we need to set an environment variable called `PULL_REQUEST`. 
 This can be accomplished by doing a curl command (change <repo> and <pull number> to match what you want to test):
 ```
-export PULL_REQUEST=$(curl https://api.github.com/repos/ansible/<repo>/pulls/<pull number>)
+export GITHUB_TOKEN=<your github token>
+export PULL_REQUEST=$(curl --header "Authorization: Bearer ${GITHUB_TOKEN}" https://api.github.com/repos/ansible/<repo>/pulls/<pull number>)
 ```
 
 After that is set you can run the Python script:
@@ -38,4 +39,4 @@ After that is set you can run the Python script:
 ./check_dvcs.py
 ```
 
-NOTE: this will use unauthenticated GitHub API requests which are throttled by default. If you hit your limit you will need to wait until your counter resets to test again.
+The action uses the workflow's built-in `GITHUB_TOKEN` automatically. When testing locally, set `GITHUB_TOKEN` to a token with read access to pull requests and repository contents.

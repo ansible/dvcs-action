@@ -44,6 +44,13 @@ class TestDoesStringContainJira:
 
 class TestGitCommitJiraNumbers:
 
+    def test_uses_github_token(self, monkeypatch):
+        monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+        with requests_mock.Mocker() as m:
+            m.register_uri("GET", "https://example.com", status_code=200, json=[])
+            check_dvcs.get_commit_jira_numbers("https://example.com", True)
+            assert m.last_request.headers["Authorization"] == "Bearer test-token"
+
     def test_invalid_url(self):
         with pytest.raises(MissingSchema):
             check_dvcs.get_commit_jira_numbers("www.example.com", True)
@@ -133,6 +140,10 @@ class TestGitCommitJiraNumbers:
 
 class TestMain:
 
+    @pytest.fixture(autouse=True)
+    def github_token(self, monkeypatch):
+        monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+
     @pytest.mark.parametrize(
         "json",
         [
@@ -169,6 +180,17 @@ class TestMain:
             with pytest.raises(SystemExit) as e:
                 check_dvcs.main()
             assert e.value.code == 255
+
+    def test_missing_github_token(self, monkeypatch, capsys):
+        monkeypatch.delenv("GITHUB_TOKEN")
+        environ['PULL_REQUEST'] = '{"title": "junk"}'
+
+        with pytest.raises(SystemExit) as e:
+            check_dvcs.main()
+
+        output = capsys.readouterr()
+        assert "Did not get a GitHub token" in output.out
+        assert e.value.code == 255
 
 
 class TestDoesPrReferenceTicket:

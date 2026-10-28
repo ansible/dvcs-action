@@ -22,5 +22,6 @@ runs:
     - name: Validate PR for DVCS
       env:
         PULL_REQUEST: ${{ toJSON(github.event.pull_request) }}
+        GITHUB_TOKEN: ${{ github.token }}
       run: ${GITHUB_ACTION_PATH}/check_dvcs.py --allow-no-jira=${{ inputs.allow_no_jira }}
       shell: bash
