@@ -1,5 +1,7 @@
 ---
 name: Unit Tests
+env:
+  UPSTREAM_REPOSITORY_ID: 892096292
 on:
   pull_request:
   push:
@@ -33,13 +35,18 @@ jobs:
           name: coverage
           path: coverage.xml
 
-      - name: Upload jUnit XML test results
-        if: github.event_name == 'push' && github.repository == 'ansible/dvcs-action' && github.ref_name == 'devel'
-        continue-on-error: true
-        run: >-
-          curl -v --user "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
-          --form "xunit_xml=@dvcs-action-test-results.xml"
-          --form "component_name=dvcs-action"
-          --form "git_commit_sha=${{ github.sha }}"
-          --form "git_repository_url=https://github.com/${{ github.repository }}"
-          "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+      - name: Upload dvcs-action jUnit test reports to the unified dashboard
+        if: >-
+          !cancelled()
+          && github.event_name == 'push'
+          && env.UPSTREAM_REPOSITORY_ID == github.repository_id
+          && github.ref_name == github.event.repository.default_branch
+        uses: ansible/gh-action-record-test-results@58376e7785cbb37b4ca0c0638edf9db4e21fd0b6
+        with:
+          aggregation-server-url: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
+          http-auth-password: >-
+            ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
+          http-auth-username: >-
+            ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
+          project-component-name: dvcs-action
+          test-result-files: dvcs-action-test-results.xml
